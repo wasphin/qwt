@@ -92,7 +92,9 @@ contains(CONFIG, QwtPlot) {
 
 	HEADERS += \
     	qwt_curve_fitter.h \
+    	qwt_data.h \
     	qwt_event_pattern.h \
+    	qwt_interval_data.h \
     	qwt_legend.h \
     	qwt_legend_item.h \
     	qwt_plot.h \
@@ -100,7 +102,6 @@ contains(CONFIG, QwtPlot) {
     	qwt_plot_dict.h \
     	qwt_plot_grid.h \
     	qwt_plot_item.h \
-    	qwt_plot_intervalcurve.h \
     	qwt_plot_layout.h \
     	qwt_plot_marker.h \
     	qwt_plot_printfilter.h \
@@ -112,11 +113,12 @@ contains(CONFIG, QwtPlot) {
     	qwt_plot_zoomer.h \
     	qwt_plot_magnifier.h \
     	qwt_raster_data.h \
-    	qwt_series_data.h \
     	qwt_scale_widget.h 
 
 	SOURCES += \
     	qwt_curve_fitter.cpp \
+    	qwt_data.cpp \
+    	qwt_interval_data.cpp \
     	qwt_legend.cpp \
     	qwt_legend_item.cpp \
     	qwt_plot.cpp \
@@ -127,7 +129,6 @@ contains(CONFIG, QwtPlot) {
     	qwt_plot_dict.cpp \
     	qwt_plot_grid.cpp \
     	qwt_plot_item.cpp \
-    	qwt_plot_intervalcurve.cpp \
     	qwt_plot_spectrogram.cpp \
     	qwt_plot_marker.cpp \
     	qwt_plot_layout.cpp \
@@ -139,7 +140,6 @@ contains(CONFIG, QwtPlot) {
     	qwt_plot_zoomer.cpp \
     	qwt_plot_magnifier.cpp \
     	qwt_raster_data.cpp \
-    	qwt_series_data.cpp \
     	qwt_scale_widget.cpp 
 }
 

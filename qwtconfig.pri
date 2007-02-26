@@ -28,15 +28,7 @@ CONFIG           += thread
 # If want to change this, you have to edit designer/designer.pro.
 ######################################################################
 
-CONFIG           += debug     # release/debug
-
-debug {
-#linux-g++:QMAKE_CXXFLAGS += -fstack-protector
-linux-g++:QMAKE_CXXFLAGS += -fstack-protector-all
-linux-g++:QMAKE_CXXFLAGS += -Wstack-protector
-}
-
-#linux-g++:QMAKE_CXXFLAGS += -fno-exceptions
+CONFIG           += release     # release/debug
 
 ######################################################################
 # Build the static/shared libraries.
@@ -66,7 +58,7 @@ CONFIG     += QwtWidgets
 # QwtSVGItem.
 ######################################################################
 
-CONFIG     += QwtSVGItem
+#CONFIG     += QwtSVGItem
 
 ######################################################################
 # If you have a commercial license you can use the MathML renderer
@@ -90,4 +82,4 @@ CONFIG     += QwtDesigner
 # Otherwise you have to build them from the examples directory.
 ######################################################################
 
-CONFIG     += QwtExamples
+#CONFIG     += QwtExamples

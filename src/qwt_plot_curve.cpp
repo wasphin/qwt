@@ -13,6 +13,7 @@
 #include "qwt_global.h"
 #include "qwt_legend.h"
 #include "qwt_legend_item.h"
+#include "qwt_data.h"
 #include "qwt_rect.h"
 #include "qwt_scale_map.h"
 #include "qwt_double_rect.h"
@@ -133,10 +134,19 @@ public:
 
 /*!
   \brief Ctor
+*/
+QwtPlotCurve::QwtPlotCurve():
+    QwtPlotItem(QwtText())
+{
+    init();
+}
+
+/*!
+  \brief Ctor
   \param title title of the curve   
 */
 QwtPlotCurve::QwtPlotCurve(const QwtText &title):
-    QwtPlotSeriesItem<QwtDoublePoint>(title)
+    QwtPlotItem(title)
 {
     init();
 }
@@ -146,7 +156,7 @@ QwtPlotCurve::QwtPlotCurve(const QwtText &title):
   \param title title of the curve   
 */
 QwtPlotCurve::QwtPlotCurve(const QString &title):
-    QwtPlotSeriesItem<QwtDoublePoint>(QwtText(title))
+    QwtPlotItem(QwtText(title))
 {
     init();
 }
@@ -154,6 +164,7 @@ QwtPlotCurve::QwtPlotCurve(const QString &title):
 //! Dtor
 QwtPlotCurve::~QwtPlotCurve()
 {
+    delete d_xy;
     delete d_data;
 }
 
@@ -166,7 +177,7 @@ void QwtPlotCurve::init()
     setItemAttribute(QwtPlotItem::AutoScale);
 
     d_data = new PrivateData;
-    d_series = new QwtPointSeriesData();
+    d_xy = new QwtPolygonFData(QwtArray<QwtDoublePoint>());
 
     setZ(20.0);
 }
@@ -330,6 +341,105 @@ void QwtPlotCurve::setBrush(const QBrush &brush)
 const QBrush& QwtPlotCurve::brush() const 
 {
     return d_data->brush;
+}
+
+
+/*!
+  Set data by copying x- and y-values from specified memory blocks.
+  Contrary to setCurveRawData(), this function makes a 'deep copy' of
+  the data.
+
+  \param xData pointer to x values
+  \param yData pointer to y values
+  \param size size of xData and yData
+
+  \sa QwtCPointerData
+*/
+void QwtPlotCurve::setData(const double *xData, const double *yData, int size)
+{
+    delete d_xy;
+    d_xy = new QwtArrayData(xData, yData, size);
+    itemChanged();
+}
+
+/*!
+  \brief Initialize data with x- and y-arrays (explicitly shared)
+
+  \param xData x data
+  \param yData y data
+
+  \sa QwtArrayData
+*/
+void QwtPlotCurve::setData(const QwtArray<double> &xData, 
+    const QwtArray<double> &yData)
+{
+    delete d_xy;
+    d_xy = new QwtArrayData(xData, yData);
+    itemChanged();
+}
+
+/*!
+  Initialize data with an array of points (explicitly shared).
+
+  \param data Data
+  \sa QwtPolygonFData
+*/
+#if QT_VERSION < 0x040000
+void QwtPlotCurve::setData(const QwtArray<QwtDoublePoint> &data)
+#else
+void QwtPlotCurve::setData(const QPolygonF &data)
+#endif
+{
+    delete d_xy;
+    d_xy = new QwtPolygonFData(data);
+    itemChanged();
+}
+
+/*!
+  Initialize data with a pointer to QwtData.
+
+  \param data Data
+  \sa QwtData::copy()
+*/
+void QwtPlotCurve::setData(const QwtData &data)
+{
+    delete d_xy;
+    d_xy = data.copy();
+    itemChanged();
+}
+
+/*!
+  \brief Initialize the data by pointing to memory blocks which are not managed
+  by QwtPlotCurve.
+
+  setRawData is provided for efficiency. It is important to keep the pointers
+  during the lifetime of the underlying QwtCPointerData class.
+
+  \param xData pointer to x data
+  \param yData pointer to y data
+  \param size size of x and y
+
+  \sa QwtCPointerData::setData.
+*/
+void QwtPlotCurve::setRawData(const double *xData, const double *yData, int size)
+{
+    delete d_xy;
+    d_xy = new QwtCPointerData(xData, yData, size);
+    itemChanged();
+}
+
+/*!
+  Returns the bounding rectangle of the curve data. If there is
+  no bounding rect, like for empty data the rectangle is invalid.
+  \sa QwtData::boundingRect(), QwtDoubleRect::isValid()
+*/
+
+QwtDoubleRect QwtPlotCurve::boundingRect() const
+{
+    if ( d_xy == NULL )
+        return QwtDoubleRect(1.0, 1.0, -2.0, -2.0); // invalid
+
+    return d_xy->boundingRect();
 }
 
 /*!
@@ -568,11 +678,9 @@ void QwtPlotCurve::drawLines(QPainter *painter,
 #endif
         for (int i = from; i <= to; i++)
         {
-            const QwtDoublePoint sample = d_series->sample(i);
-
             QwtDoublePoint &p = points[i];
-            p.setX( xMap.xTransform(sample.x()) );
-            p.setY( yMap.xTransform(sample.y()) );
+            p.setX( xMap.xTransform(x(i)) );
+            p.setY( yMap.xTransform(y(i)) );
         }
 
         points = d_data->curveFitter->fitCurve(points);
@@ -624,18 +732,13 @@ void QwtPlotCurve::drawLines(QPainter *painter,
 
         if ( d_data->paintAttributes & PaintFiltered )
         {
-            QwtDoublePoint sample = d_series->sample(from);
-
-            QPoint pp( xMap.transform(sample.x()), 
-                yMap.transform(sample.y()) );
+            QPoint pp( xMap.transform(x(from)), yMap.transform(y(from)) );
             polyline.setPoint(0, pp);
 
             int count = 1;
             for (int i = from + 1; i <= to; i++)
             {
-                sample = d_series->sample(i);
-                const QPoint pi(xMap.transform(sample.x()), 
-                    yMap.transform(sample.y()));
+                const QPoint pi(xMap.transform(x(i)), yMap.transform(y(i)));
                 if ( pi != pp )
                 {
                     polyline.setPoint(count, pi);
@@ -651,9 +754,8 @@ void QwtPlotCurve::drawLines(QPainter *painter,
         {
             for (int i = from; i <= to; i++)
             {
-                const QwtDoublePoint sample = d_series->sample(i);
-                int xi = xMap.transform(sample.x());
-                int yi = yMap.transform(sample.y());
+                int xi = xMap.transform(x(i));
+                int yi = yMap.transform(y(i));
 
                 polyline.setPoint(i - from, xi, yi);
             }
@@ -692,9 +794,8 @@ void QwtPlotCurve::drawSticks(QPainter *painter,
 
     for (int i = from; i <= to; i++)
     {
-        const QwtDoublePoint sample = d_series->sample(i);
-        const int xi = xMap.transform(sample.x());
-        const int yi = yMap.transform(sample.y());
+        const int xi = xMap.transform(x(i));
+        const int yi = yMap.transform(y(i));
 
         if (d_data->attributes & Xfy)
             QwtPainter::drawLine(painter, x0, yi, xi, yi);
@@ -732,9 +833,7 @@ void QwtPlotCurve::drawDots(QPainter *painter,
     {
         if ( doFill )   
         {
-            QwtDoublePoint sample = d_series->sample(from);
-            QPoint pp( xMap.transform(sample.x()), 
-                yMap.transform(sample.y()) );
+            QPoint pp( xMap.transform(x(from)), yMap.transform(y(from)) );
 
             QwtPainter::drawPoint(painter, pp.x(), pp.y());
             polyline.setPoint(0, pp);
@@ -742,9 +841,7 @@ void QwtPlotCurve::drawDots(QPainter *painter,
             int count = 1;
             for (int i = from + 1; i <= to; i++)
             {
-                sample = d_series->sample(i);
-                const QPoint pi(xMap.transform(sample.x()), 
-                    yMap.transform(sample.y()));
+                const QPoint pi(xMap.transform(x(i)), yMap.transform(y(i)));
                 if ( pi != pp )
                 {
                     QwtPainter::drawPoint(painter, pi.x(), pi.y());
@@ -767,9 +864,8 @@ void QwtPlotCurve::drawDots(QPainter *painter,
 
             for (int i = from; i <= to; i++)
             {
-                const QwtDoublePoint sample = d_series->sample(i);
-                const QPoint p( xMap.transform(sample.x()),
-                    yMap.transform(sample.y()) );
+                const QPoint p( xMap.transform(x(i)),
+                    yMap.transform(y(i)) );
 
                 if ( pixelMatrix.testPixel(p) )
                     QwtPainter::drawPoint(painter, p.x(), p.y());
@@ -780,9 +876,8 @@ void QwtPlotCurve::drawDots(QPainter *painter,
     {
         for (int i = from; i <= to; i++)
         {
-            const QwtDoublePoint sample = d_series->sample(i);
-            const int xi = xMap.transform(sample.x());
-            const int yi = yMap.transform(sample.y());
+            const int xi = xMap.transform(x(i));
+            const int yi = yMap.transform(y(i));
             QwtPainter::drawPoint(painter, xi, yi);
 
             if ( doFill )
@@ -829,9 +924,8 @@ void QwtPlotCurve::drawSteps(QPainter *painter,
     int i,ip;
     for (i = from, ip = 0; i <= to; i++, ip += 2)
     {
-        const QwtDoublePoint sample = d_series->sample(i);
-        const int xi = xMap.transform(sample.x());
-        const int yi = yMap.transform(sample.y());
+        const int xi = xMap.transform(x(i));
+        const int yi = yMap.transform(y(i));
 
         if ( ip > 0 )
         {
@@ -1051,10 +1145,8 @@ void QwtPlotCurve::drawSymbols(QPainter *painter, const QwtSymbol &symbol,
 
         for (int i = from; i <= to; i++)
         {
-            const QwtDoublePoint sample = d_series->sample(i);
-
-            const QPoint pi( xMap.transform(sample.x()),
-                yMap.transform(sample.y()) );
+            const QPoint pi( xMap.transform(x(i)),
+                yMap.transform(y(i)) );
 
             if ( pixelMatrix.testPixel(pi) )
             {
@@ -1067,10 +1159,8 @@ void QwtPlotCurve::drawSymbols(QPainter *painter, const QwtSymbol &symbol,
     {
         for (int i = from; i <= to; i++)
         {
-            const QwtDoublePoint sample = d_series->sample(i);
-
-            const int xi = xMap.transform(sample.x());
-            const int yi = yMap.transform(sample.y());
+            const int xi = xMap.transform(x(i));
+            const int yi = yMap.transform(y(i));
 
             rect.moveCenter(QPoint(xi, yi));
             symbol.draw(painter, rect);
@@ -1109,6 +1199,15 @@ double QwtPlotCurve::baseline() const
     return d_data->reference; 
 }
 
+/*!
+  Return the size of the data arrays
+  \sa setData()
+*/
+int QwtPlotCurve::dataSize() const
+{
+    return d_xy->size();
+}
+
 int QwtPlotCurve::closestPoint(const QPoint &pos, double *dist) const
 {
     if ( plot() == NULL || dataSize() <= 0 )
@@ -1122,10 +1221,8 @@ int QwtPlotCurve::closestPoint(const QPoint &pos, double *dist) const
 
     for (int i=0; i < dataSize(); i++)
     {
-        const QwtDoublePoint sample = d_series->sample(i);
-
-        const double cx = xMap.xTransform(sample.x()) - pos.x();
-        const double cy = yMap.xTransform(sample.y()) - pos.y();
+        const double cx = xMap.xTransform(x(i)) - pos.x();
+        const double cy = yMap.xTransform(y(i)) - pos.y();
 
         const double f = qwtSqr(cx) + qwtSqr(cy);
         if (f < dmin)
@@ -1208,80 +1305,3 @@ void QwtPlotCurve::updateLegend(QwtLegend *legend) const
     legendItem->setUpdatesEnabled(doUpdate);
     legendItem->update();
 }
-
-void QwtPlotCurve::setData(const QwtSeriesData<QwtDoublePoint> &data)
-{
-    QwtPlotSeriesItem<QwtDoublePoint>::setData(data);
-}
-
-#ifndef QWT_NO_COMPAT
-
-/*!
-  \brief Initialize the data by pointing to memory blocks which are not managed
-  by QwtPlotCurve.
-
-  setRawData is provided for efficiency. It is important to keep the pointers
-  during the lifetime of the underlying QwtCPointerData class.
-
-  \param xData pointer to x data
-  \param yData pointer to y data
-  \param size size of x and y
-
-  \sa QwtCPointerData::setData.
-*/
-void QwtPlotCurve::setRawData(const double *xData, const double *yData, int size)
-{
-    delete d_series;
-    d_series = new QwtCPointerData(xData, yData, size);
-    itemChanged();
-}
-
-/*!
-  Set data by copying x- and y-values from specified memory blocks.
-  Contrary to setCurveRawData(), this function makes a 'deep copy' of
-  the data.
-
-  \param xData pointer to x values
-  \param yData pointer to y values
-  \param size size of xData and yData
-
-  \sa QwtCPointerData
-*/
-void QwtPlotCurve::setData(const double *xData, const double *yData, int size)
-{
-    delete d_series;
-    d_series = new QwtPointArrayData(xData, yData, size);
-    itemChanged();
-}
-
-/*!
-  \brief Initialize data with x- and y-arrays (explicitly shared)
-
-  \param xData x data
-  \param yData y data
-
-  \sa QwtArrayData
-*/
-void QwtPlotCurve::setData(const QwtArray<double> &xData, 
-    const QwtArray<double> &yData)
-{
-    delete d_series;
-    d_series = new QwtPointArrayData(xData, yData);
-    itemChanged();
-}
-
-/*!
-  Initialize data with an array of points (explicitly shared).
-
-  \param data Data
-  \sa QwtPolygonFData
-*/
-void QwtPlotCurve::setData(const QwtArray<QwtDoublePoint> &data)
-{
-    delete d_series;
-    d_series = new QwtPointSeriesData(data);
-    itemChanged();
-}
-
-#endif // !QWT_NO_COMPAT
-

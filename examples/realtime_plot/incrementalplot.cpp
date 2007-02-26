@@ -85,7 +85,7 @@ void IncrementalPlot::appendData(double *x, double *y, int size)
     d_data->append(x, y, size);
     d_curve->setRawData(d_data->x(), d_data->y(), d_data->count());
 #ifdef __GNUC__
-#warning better use QwtSeriesData
+#warning better use QwtData
 #endif
 
     const bool cacheMode = 
